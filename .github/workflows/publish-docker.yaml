@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - deploy
 
 env:
   HUB: ghcr.io/arugal/sample-controller
