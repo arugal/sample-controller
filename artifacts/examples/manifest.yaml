@@ -1,0 +1,107 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: foos.samplecontroller.k8s.io
+  # for more information on the below annotation, please see
+  # https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/2337-k8s.io-group-protection/README.md
+  annotations:
+    "api-approved.kubernetes.io": "unapproved, experimental-only; please get an approval from Kubernetes API reviewers if you're trying to develop a CRD in the *.k8s.io or *.kubernetes.io groups"
+spec:
+  group: samplecontroller.k8s.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        # schema used for validation
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                deploymentName:
+                  type: string
+                replicas:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+            status:
+              type: object
+              properties:
+                availableReplicas:
+                  type: integer
+      # subresources for the custom resource
+      subresources:
+        # enables the status subresource
+        status: {}
+  names:
+    kind: Foo
+    plural: foos
+  scope: Namespaced
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sample-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sample-controller
+rules:
+  - verbs:
+      - get
+      - list
+      - update
+      - create
+      - delete
+      - watch
+    resources:
+      - deployments
+    apiGroups:
+      - apps
+  - verbs:
+      - get
+      - list
+      - update
+      - create
+      - delete
+      - watch
+    apiGroups:
+      - "samplecontroller.k8s.io"
+    resources:
+      - foos
+      - foos/status
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sample-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sample-controller
+subjects:
+  - kind: ServiceAccount
+    namespace: default
+    name: sample-controller
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-controller
+spec:
+  selector:
+    matchLabels:
+      app: sample-controller
+  template:
+    metadata:
+      labels:
+        app: sample-controller
+    spec:
+      serviceAccountName: sample-controller
+      containers:
+        - name: sample-controller
+          image: ghcr.io/arugal/sample-controller/controller:latest
+          imagePullPolicy: IfNotPresent
